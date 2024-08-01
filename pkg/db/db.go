@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"database/sql"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -42,12 +41,12 @@ func connectToDatabase() error {
 	var err error
 	dbconn, err = sql.Open("sqlite3", databaseFile)
 	if err != nil {
-		fmt.Println("Error opening database:", err)
+		fmt.Printf("Error opening database: %v\n", err)
 		return err
 	}
 	err = dbconn.Ping()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Error opening database: %v\n", err)
 		return err
 	}
 
@@ -55,7 +54,11 @@ func connectToDatabase() error {
 }
 
 func InitDatabase() error {
-	connectToDatabase()
+	err := connectToDatabase()
+
+	if err != nil {
+		return err
+	}
 
 	if !checkSchemaState() {
 		LoadDatabaseFromCSVFile("./data/brasileirao_serie_a.csv")
@@ -300,39 +303,4 @@ func LoadDatabaseFromCSVFile(csvFile string) error {
 	}
 
 	return nil
-}
-
-func GetAllMatchesByYearAndTeam(year int, team string) ([]Partida, error) {
-	partidas := []Partida{}
-	rows, err := dbconn.Query(fmt.Sprintf(`SELECT p.ano_campeonato, p.rodada, 
-											(SELECT nome FROM times WHERE id = p.time_mandante_id),
-											(SELECT nome FROM times WHERE id = p.time_visitante_id),
-											p.gols_mandante,
-											p.gols_visitante
-											FROM partidas p
-											INNER JOIN times t ON t.id = p.time_mandante_id OR t.id = p.time_visitante_id 
-											WHERE p.ano_campeonato = %v AND t.nome = '%v';`, year, team))
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	for rows.Next() {
-		partida := Partida{}
-		err := rows.Scan(&partida.ano_campeonato,
-			&partida.rodada,
-			&partida.time_mandante,
-			&partida.time_visitante,
-			&partida.gols_mandante,
-			&partida.gols_visitante)
-
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
-
-		partidas = append(partidas, partida)
-	}
-
-	return partidas, nil
 }
